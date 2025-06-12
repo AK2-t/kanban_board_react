@@ -1,3 +1,25 @@
+export interface Comment {
+  id: string;
+  text: string;
+  author: string;
+  createdAt: number;
+}
+
+export interface HistoryEntry {
+  id: string;
+  action: string;
+  details: string;
+  author: string;
+  timestamp: number;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  avatar?: string;
+  role?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -6,8 +28,12 @@ export interface Task {
   priority: 'high' | 'medium' | 'low';
   labels: string[];
   assignee: string | null;
+  assignees: string[]; // Multiple assignees support
   columnId: string;
   createdAt: number;
+  comments: Comment[];
+  history: HistoryEntry[];
+  hasNewComments?: boolean; // For notification indicator
 }
 
 export interface Column {
@@ -27,6 +53,7 @@ export interface AppData {
   tasks: { [key: string]: Task };
   boards: { [key: string]: Board };
   boardOrder: string[];
+  users: { [key: string]: User };
 }
 
 export type Priority = 'high' | 'medium' | 'low';

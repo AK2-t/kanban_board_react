@@ -1,11 +1,12 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { AppData, Board, Task, Column, CustomLabel } from '../types';
+import { AppData, Board, Task, Column, CustomLabel, Comment, HistoryEntry, User } from '../types';
 
 type BoardContextType = {
   data: AppData;
   currentBoardId: string | null;
   labels: CustomLabel[];
+  currentUser: User;
   addBoard: (title: string) => void;
   updateBoard: (boardId: string, title: string) => void;
   deleteBoard: (boardId: string) => void;
@@ -13,11 +14,15 @@ type BoardContextType = {
   addColumn: (boardId: string, title: string) => void;
   updateColumn: (boardId: string, columnId: string, title: string) => void;
   deleteColumn: (boardId: string, columnId: string) => void;
-  addTask: (columnId: string, task: Omit<Task, 'id' | 'columnId' | 'createdAt'>) => void;
+  addTask: (columnId: string, task: Omit<Task, 'id' | 'columnId' | 'createdAt' | 'comments' | 'history' | 'assignees' | 'hasNewComments'>) => void;
   updateTask: (taskId: string, updatedTask: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
   moveTask: (taskId: string, sourceColumnId: string, destinationColumnId: string, sourceIndex: number, destinationIndex: number) => void;
   moveColumn: (boardId: string, sourceIndex: number, destinationIndex: number) => void;
+  addComment: (taskId: string, text: string) => void;
+  addHistoryEntry: (taskId: string, action: string, details: string) => void;
+  addUser: (name: string, avatar?: string, role?: string) => User;
+  updateUser: (userId: string, updates: Partial<User>) => void;
   addLabel: (name: string, color: string) => void;
   updateLabel: (labelId: string, name: string, color: string) => void;
   deleteLabel: (labelId: string) => void;
@@ -77,18 +82,44 @@ const createDefaultBoard = (): Board => {
 
 const initialBoard = createDefaultBoard();
 
+const defaultUser: User = {
+  id: uuidv4(),
+  name: 'デフォルトユーザー',
+  avatar: undefined,
+  role: 'メンバー',
+};
+
 const initialData: AppData = {
   tasks: {},
   boards: {
     [initialBoard.id]: initialBoard,
   },
   boardOrder: [initialBoard.id],
+  users: {
+    [defaultUser.id]: defaultUser,
+  },
 };
 
 export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
   const [data, setData] = useState<AppData>(() => {
     const savedData = localStorage.getItem('kanbanData');
-    return savedData ? JSON.parse(savedData) : initialData;
+    const parsedData = savedData ? JSON.parse(savedData) : initialData;
+    
+    // Migrate old data structure
+    if (!parsedData.users) {
+      parsedData.users = { [defaultUser.id]: defaultUser };
+    }
+    
+    // Migrate tasks to add new fields
+    Object.keys(parsedData.tasks).forEach(taskId => {
+      const task = parsedData.tasks[taskId];
+      if (!task.comments) task.comments = [];
+      if (!task.history) task.history = [];
+      if (!task.assignees) task.assignees = task.assignee ? [task.assignee] : [];
+      if (task.hasNewComments === undefined) task.hasNewComments = false;
+    });
+    
+    return parsedData;
   });
 
   const [currentBoardId, setCurrentBoardId] = useState<string | null>(() => {
@@ -98,6 +129,11 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
   const [labels, setLabels] = useState<CustomLabel[]>(() => {
     const savedLabels = localStorage.getItem('kanbanLabels');
     return savedLabels ? JSON.parse(savedLabels) : initialLabels;
+  });
+
+  const [currentUser] = useState<User>(() => {
+    const users = Object.values(data.users);
+    return users.length > 0 ? users[0] : defaultUser;
   });
 
   useEffect(() => {
@@ -178,6 +214,7 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
         tasks: newTasks,
         boards: remainingBoards,
         boardOrder: newBoardOrder,
+        users: prevData.users,
       };
       
       // Update current board ID if necessary
@@ -293,7 +330,7 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
     });
   };
 
-  const addTask = (columnId: string, task: Omit<Task, 'id' | 'columnId' | 'createdAt'>) => {
+  const addTask = (columnId: string, task: Omit<Task, 'id' | 'columnId' | 'createdAt' | 'comments' | 'history' | 'assignees' | 'hasNewComments'>) => {
     const newTaskId = uuidv4();
     
     setData((prevData) => {
@@ -316,11 +353,26 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
       if (!column) return prevData;
       
       const newTask: Task = {
+        ...task,
         id: newTaskId,
         columnId,
         createdAt: Date.now(),
-        ...task,
+        comments: [],
+        history: [],
+        assignees: task.assignee ? [task.assignee] : [],
+        hasNewComments: false,
       };
+      
+      // Add creation history entry
+      if (newTask.history) {
+        newTask.history.push({
+          id: uuidv4(),
+          action: 'created',
+          details: 'タスクが作成されました',
+          author: currentUser.name,
+          timestamp: Date.now(),
+        });
+      }
       
       const updatedColumn = {
         ...column,
@@ -358,6 +410,24 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
         ...task,
         ...updatedTask,
       };
+      
+      // Add history entry for significant changes
+      const significantFields = ['title', 'description', 'dueDate', 'priority', 'assignee', 'assignees'];
+      const changedFields = significantFields.filter(field => 
+        updatedTask[field as keyof Task] !== undefined && 
+        updatedTask[field as keyof Task] !== task[field as keyof Task]
+      );
+      
+      if (changedFields.length > 0 && newTask.history) {
+        const historyEntry: HistoryEntry = {
+          id: uuidv4(),
+          action: 'updated',
+          details: `${changedFields.join(', ')}が更新されました`,
+          author: currentUser.name,
+          timestamp: Date.now(),
+        };
+        newTask.history = [...newTask.history, historyEntry];
+      }
 
       return {
         ...prevData,
@@ -465,11 +535,21 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
       // Update the task's columnId if it's moving to a different column
       let updatedTasks = prevData.tasks;
       if (sourceColumnId !== destinationColumnId) {
+        const task = prevData.tasks[taskId];
+        const historyEntry: HistoryEntry = {
+          id: uuidv4(),
+          action: 'moved',
+          details: `タスクが移動されました`,
+          author: currentUser.name,
+          timestamp: Date.now(),
+        };
+        
         updatedTasks = {
           ...prevData.tasks,
           [taskId]: {
-            ...prevData.tasks[taskId],
+            ...task,
             columnId: destinationColumnId,
+            history: [...(task.history || []), historyEntry],
           },
         };
       }
@@ -589,10 +669,104 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
     }
   };
 
+  const addComment = (taskId: string, text: string) => {
+    setData((prevData) => {
+      const task = prevData.tasks[taskId];
+      if (!task) return prevData;
+
+      const newComment: Comment = {
+        id: uuidv4(),
+        text,
+        author: currentUser.name,
+        createdAt: Date.now(),
+      };
+
+      const updatedTask = {
+        ...task,
+        comments: [...(task.comments || []), newComment],
+        hasNewComments: true,
+      };
+
+      return {
+        ...prevData,
+        tasks: {
+          ...prevData.tasks,
+          [taskId]: updatedTask,
+        },
+      };
+    });
+  };
+
+  const addHistoryEntry = (taskId: string, action: string, details: string) => {
+    setData((prevData) => {
+      const task = prevData.tasks[taskId];
+      if (!task) return prevData;
+
+      const historyEntry: HistoryEntry = {
+        id: uuidv4(),
+        action,
+        details,
+        author: currentUser.name,
+        timestamp: Date.now(),
+      };
+
+      const updatedTask = {
+        ...task,
+        history: [...(task.history || []), historyEntry],
+      };
+
+      return {
+        ...prevData,
+        tasks: {
+          ...prevData.tasks,
+          [taskId]: updatedTask,
+        },
+      };
+    });
+  };
+
+  const addUser = (name: string, avatar?: string, role?: string): User => {
+    const newUser: User = {
+      id: uuidv4(),
+      name,
+      avatar,
+      role: role || 'メンバー',
+    };
+
+    setData((prevData) => ({
+      ...prevData,
+      users: {
+        ...prevData.users,
+        [newUser.id]: newUser,
+      },
+    }));
+
+    return newUser;
+  };
+
+  const updateUser = (userId: string, updates: Partial<User>) => {
+    setData((prevData) => {
+      const user = prevData.users[userId];
+      if (!user) return prevData;
+
+      return {
+        ...prevData,
+        users: {
+          ...prevData.users,
+          [userId]: {
+            ...user,
+            ...updates,
+          },
+        },
+      };
+    });
+  };
+
   const value = {
     data,
     currentBoardId,
     labels,
+    currentUser,
     addBoard,
     updateBoard,
     deleteBoard,
@@ -605,6 +779,10 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
     deleteTask,
     moveTask,
     moveColumn,
+    addComment,
+    addHistoryEntry,
+    addUser,
+    updateUser,
     addLabel,
     updateLabel,
     deleteLabel,

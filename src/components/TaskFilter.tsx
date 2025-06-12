@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useBoard } from '../context/BoardContext';
 import { useTheme } from '../context/ThemeContext';
 import { Task } from '../types';
+import { isOverdue, isToday, isUpcoming, formatDate } from '../utils/dateUtils';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, FormControl, InputLabel, Select, MenuItem, TextField, Box, Chip, FormHelperText, Typography, Divider, SelectChangeEvent } from '@mui/material';
 
 interface TaskFilterProps {
@@ -18,6 +19,8 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [assignee, setAssignee] = useState<string>('all');
   const [uniqueAssignees, setUniqueAssignees] = useState<string[]>([]);
+  const [dueDateFilter, setDueDateFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('created');
 
   useEffect(() => {
     if (!currentBoardId || !open) return;
@@ -35,8 +38,15 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
         const task = data.tasks[taskId];
         if (task) {
           allTasks.push(task);
+          // Collect assignees from both legacy assignee field and new assignees array
           if (task.assignee) {
             assignees.add(task.assignee);
+          }
+          if (task.assignees && task.assignees.length > 0) {
+            task.assignees.forEach(assigneeId => {
+              const userName = data.users[assigneeId]?.name || assigneeId;
+              assignees.add(userName);
+            });
           }
         }
       });
@@ -70,8 +80,55 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
     
     // Assignee filter
     if (assignee !== 'all') {
-      filtered = filtered.filter(task => task.assignee === assignee);
+      filtered = filtered.filter(task => {
+        if (task.assignees && task.assignees.length > 0) {
+          const assigneeNames = task.assignees
+            .map(assigneeId => data.users[assigneeId]?.name || assigneeId)
+            .filter(name => name);
+          return assigneeNames.includes(assignee);
+        }
+        return task.assignee === assignee;
+      });
     }
+    
+    // Due date filter
+    if (dueDateFilter !== 'all') {
+      filtered = filtered.filter(task => {
+        switch (dueDateFilter) {
+          case 'overdue':
+            return isOverdue(task.dueDate);
+          case 'today':
+            return isToday(task.dueDate);
+          case 'upcoming':
+            return isUpcoming(task.dueDate);
+          case 'no-date':
+            return !task.dueDate;
+          case 'with-date':
+            return !!task.dueDate;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Sort tasks
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'dueDate':
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        case 'priority':
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          return priorityOrder[b.priority] - priorityOrder[a.priority];
+        case 'title':
+          return a.title.localeCompare(b.title);
+        case 'created':
+        default:
+          return b.createdAt - a.createdAt;
+      }
+    });
     
     setFilteredTasks(filtered);
   }, [data, currentBoardId, searchTerm, priority, selectedLabelIds, assignee, open]);
@@ -85,6 +142,8 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
     setPriority('all');
     setSelectedLabelIds([]);
     setAssignee('all');
+    setDueDateFilter('all');
+    setSortBy('created');
   };
 
   if (!currentBoardId) return null;
@@ -130,6 +189,40 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
               {uniqueAssignees.map((name) => (
                 <MenuItem key={name} value={name}>{name}</MenuItem>
               ))}
+            </Select>
+          </FormControl>
+        </Box>
+        
+        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="duedate-filter-label">期限</InputLabel>
+            <Select
+              labelId="duedate-filter-label"
+              value={dueDateFilter}
+              label="期限"
+              onChange={(e) => setDueDateFilter(e.target.value)}
+            >
+              <MenuItem value="all">すべて</MenuItem>
+              <MenuItem value="overdue">期限切れ</MenuItem>
+              <MenuItem value="today">今日期限</MenuItem>
+              <MenuItem value="upcoming">近日期限</MenuItem>
+              <MenuItem value="with-date">期限あり</MenuItem>
+              <MenuItem value="no-date">期限なし</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth margin="dense">
+            <InputLabel id="sort-label">並び順</InputLabel>
+            <Select
+              labelId="sort-label"
+              value={sortBy}
+              label="並び順"
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <MenuItem value="created">作成日時</MenuItem>
+              <MenuItem value="dueDate">期限</MenuItem>
+              <MenuItem value="priority">優先度</MenuItem>
+              <MenuItem value="title">タイトル</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -219,6 +312,10 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
                   <Typography variant="caption" color="textSecondary">
                     {column ? `カラム: ${column.title}` : ''}
                     {task.priority !== 'medium' && ` | 優先度: ${task.priority === 'high' ? '高' : '低'}`}
+                    {task.dueDate && ` | 期限: ${formatDate(task.dueDate)}`}
+                    {isOverdue(task.dueDate) && ' (期限切れ)'}
+                    {isToday(task.dueDate) && ' (今日期限)'}
+                    {isUpcoming(task.dueDate) && ' (近日期限)'}
                   </Typography>
                 </Box>
               );

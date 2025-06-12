@@ -73,6 +73,61 @@ const Statistics: React.FC = () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5); // Top 5 labels
     
+    // Calculate user statistics
+    const userStats: { [key: string]: { total: number; completed: number; overdue: number; high: number } } = {};
+    
+    Object.values(data.users).forEach(user => {
+      userStats[user.id] = { total: 0, completed: 0, overdue: 0, high: 0 };
+    });
+    
+    allTasks.forEach(task => {
+      // Handle assignees array
+      if (task.assignees && task.assignees.length > 0) {
+        task.assignees.forEach(assigneeId => {
+          if (userStats[assigneeId]) {
+            userStats[assigneeId].total++;
+            if (completedColumnIds.includes(task.columnId)) {
+              userStats[assigneeId].completed++;
+            }
+            if (!completedColumnIds.includes(task.columnId) && isOverdue(task.dueDate)) {
+              userStats[assigneeId].overdue++;
+            }
+            if (task.priority === 'high') {
+              userStats[assigneeId].high++;
+            }
+          }
+        });
+      }
+      // Handle legacy assignee field
+      else if (task.assignee) {
+        const user = Object.values(data.users).find(u => u.name === task.assignee);
+        if (user && userStats[user.id]) {
+          userStats[user.id].total++;
+          if (completedColumnIds.includes(task.columnId)) {
+            userStats[user.id].completed++;
+          }
+          if (!completedColumnIds.includes(task.columnId) && isOverdue(task.dueDate)) {
+            userStats[user.id].overdue++;
+          }
+          if (task.priority === 'high') {
+            userStats[user.id].high++;
+          }
+        }
+      }
+    });
+    
+    // Get top performing users
+    const topUsers = Object.keys(userStats)
+      .map(userId => ({
+        user: data.users[userId],
+        stats: userStats[userId],
+        completionRate: userStats[userId].total > 0 ? 
+          Math.round((userStats[userId].completed / userStats[userId].total) * 100) : 0
+      }))
+      .filter(item => item.stats.total > 0)
+      .sort((a, b) => b.completionRate - a.completionRate)
+      .slice(0, 5);
+    
     return {
       totalTasks,
       completedTasks,
@@ -80,6 +135,7 @@ const Statistics: React.FC = () => {
       overdueTasks,
       highPriorityTasks,
       topLabels: sortedLabels,
+      topUsers,
     };
   }, [data, currentBoardId, labels]);
 
@@ -237,6 +293,68 @@ const Statistics: React.FC = () => {
           </Typography>
         )}
       </Paper>
+      
+      {/* User Statistics */}
+      {stats.topUsers.length > 0 && (
+        <Paper 
+          sx={{ 
+            marginTop: 2,
+            padding: '1rem',
+            backgroundColor: darkMode ? '#333' : '#fff',
+            color: darkMode ? '#fff' : '#333'
+          }}
+        >
+          <Typography 
+            variant="subtitle2" 
+            color="textSecondary"
+            sx={{ fontWeight: 500 }}
+          >
+            担当者別統計
+          </Typography>
+          
+          <Box sx={{ 
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            marginTop: '1rem'
+          }}>
+            {stats.topUsers.map(({ user, stats: userTaskStats, completionRate }) => (
+              <Box 
+                key={user.id}
+                sx={{
+                  minWidth: '200px',
+                  padding: '0.5rem',
+                  border: `1px solid ${darkMode ? '#555' : '#ddd'}`,
+                  borderRadius: '4px',
+                  backgroundColor: darkMode ? '#444' : '#f9f9f9'
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
+                  {user.name}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {user.role || 'メンバー'}
+                </Typography>
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="body2">
+                    完了率: {completionRate}% ({userTaskStats.completed}/{userTaskStats.total})
+                  </Typography>
+                  {userTaskStats.overdue > 0 && (
+                    <Typography variant="body2" color="error">
+                      期限切れ: {userTaskStats.overdue}件
+                    </Typography>
+                  )}
+                  {userTaskStats.high > 0 && (
+                    <Typography variant="body2" color="warning.main">
+                      高優先度: {userTaskStats.high}件
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      )}
     </Box>
   );
 };

@@ -5,8 +5,8 @@ import TaskDetails from './TaskDetails';
 import { formatDate, isOverdue, isToday, isUpcoming } from '../utils/dateUtils';
 import { useTheme } from '../context/ThemeContext';
 import { useBoard } from '../context/BoardContext';
-import { Paper, Typography, Chip, Box } from '@mui/material';
-import { PriorityHigh, Label } from '@mui/icons-material';
+import { Paper, Typography, Chip, Box, Badge } from '@mui/material';
+import { PriorityHigh, Label, Comment as CommentIcon } from '@mui/icons-material';
 
 interface TaskProps {
   task: TaskType;
@@ -15,8 +15,19 @@ interface TaskProps {
 
 const TaskCard: React.FC<TaskProps> = ({ task, index }) => {
   const { darkMode } = useTheme();
-  const { labels } = useBoard();
+  const { labels, data } = useBoard();
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  const getAssigneeNames = () => {
+    if (task.assignees && task.assignees.length > 0) {
+      return task.assignees
+        .map(assigneeId => data.users[assigneeId]?.name || assigneeId)
+        .filter(name => name);
+    }
+    return task.assignee ? [task.assignee] : [];
+  };
+
+  const assigneeNames = getAssigneeNames();
 
   const handleCardClick = () => {
     setDetailsOpen(true);
@@ -104,16 +115,35 @@ const TaskCard: React.FC<TaskProps> = ({ task, index }) => {
               }
             }}
           >
-            <Typography 
-              variant="body1" 
-              sx={{ 
-                fontWeight: 500, 
-                marginBottom: '0.5rem', 
-                wordBreak: 'break-word'
-              }}
-            >
-              {task.title}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Typography 
+                variant="body1" 
+                sx={{ 
+                  fontWeight: 500, 
+                  marginBottom: '0.5rem', 
+                  wordBreak: 'break-word',
+                  flex: 1
+                }}
+              >
+                {task.title}
+              </Typography>
+              
+              {task.hasNewComments && task.comments && task.comments.length > 0 && (
+                <Badge 
+                  badgeContent={task.comments.length} 
+                  color="error"
+                  sx={{ marginLeft: '8px' }}
+                >
+                  <CommentIcon 
+                    fontSize="small" 
+                    sx={{ 
+                      color: darkMode ? '#90caf9' : '#1976d2',
+                      opacity: 0.7
+                    }} 
+                  />
+                </Badge>
+              )}
+            </Box>
             
             {taskLabels.length > 0 && (
               <Box sx={{ 
@@ -165,16 +195,31 @@ const TaskCard: React.FC<TaskProps> = ({ task, index }) => {
                   </Box>
                 )}
                 
-                {task.assignee && (
-                  <Chip 
-                    label={task.assignee} 
-                    size="small"
-                    sx={{ 
-                      height: '20px', 
-                      fontSize: '0.7rem',
-                      marginRight: '4px' 
-                    }} 
-                  />
+                {assigneeNames.length > 0 && (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '2px', marginRight: '4px' }}>
+                    {assigneeNames.slice(0, 2).map((name, index) => (
+                      <Chip 
+                        key={index}
+                        label={name} 
+                        size="small"
+                        sx={{ 
+                          height: '20px', 
+                          fontSize: '0.7rem'
+                        }} 
+                      />
+                    ))}
+                    {assigneeNames.length > 2 && (
+                      <Chip 
+                        label={`+${assigneeNames.length - 2}`}
+                        size="small"
+                        sx={{ 
+                          height: '20px', 
+                          fontSize: '0.7rem',
+                          backgroundColor: darkMode ? '#666' : '#f0f0f0'
+                        }} 
+                      />
+                    )}
+                  </Box>
                 )}
               </Box>
               

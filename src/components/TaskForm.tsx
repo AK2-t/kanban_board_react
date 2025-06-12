@@ -11,13 +11,16 @@ interface TaskFormProps {
 
 const TaskForm: React.FC<TaskFormProps> = ({ columnId, onClose }) => {
   const { darkMode } = useTheme();
-  const { addTask, labels } = useBoard();
+  const { addTask, labels, data } = useBoard();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [assignee, setAssignee] = useState<string | null>(null);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+
+  const availableUsers = Object.values(data.users);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +32,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ columnId, onClose }) => {
       dueDate,
       priority,
       labels: selectedLabelIds,
-      assignee,
+      assignee: selectedAssignees.length > 0 ? selectedAssignees[0] : null,
     });
 
     onClose();
@@ -41,6 +44,10 @@ const TaskForm: React.FC<TaskFormProps> = ({ columnId, onClose }) => {
 
   const handleLabelChange = (event: SelectChangeEvent<string[]>) => {
     setSelectedLabelIds(event.target.value as string[]);
+  };
+
+  const handleAssigneeChange = (event: SelectChangeEvent<string[]>) => {
+    setSelectedAssignees(event.target.value as string[]);
   };
 
   return (
@@ -109,14 +116,50 @@ const TaskForm: React.FC<TaskFormProps> = ({ columnId, onClose }) => {
           </FormControl>
         </Box>
 
-        <TextField
-          margin="dense"
-          label="担当者"
-          fullWidth
-          value={assignee || ''}
-          onChange={(e) => setAssignee(e.target.value || null)}
-          size="small"
-        />
+        <FormControl fullWidth margin="dense" size="small">
+          <InputLabel id="assignees-label">担当者</InputLabel>
+          <Select
+            labelId="assignees-label"
+            multiple
+            value={selectedAssignees}
+            label="担当者"
+            onChange={handleAssigneeChange}
+            renderValue={(selected) => (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {(selected as string[]).map((userId) => {
+                  const user = availableUsers.find(u => u.id === userId);
+                  return user ? (
+                    <Chip 
+                      key={user.id} 
+                      label={user.name} 
+                      size="small"
+                      sx={{ 
+                        backgroundColor: darkMode ? '#555' : '#e3f2fd',
+                        color: darkMode ? '#fff' : '#1976d2',
+                        height: '20px',
+                        fontSize: '0.7rem'
+                      }} 
+                    />
+                  ) : null;
+                })}
+              </Box>
+            )}
+          >
+            {availableUsers.map((user) => (
+              <MenuItem key={user.id} value={user.id}>
+                <Chip 
+                  label={user.name} 
+                  size="small"
+                  sx={{ 
+                    backgroundColor: darkMode ? '#555' : '#e3f2fd',
+                    color: darkMode ? '#fff' : '#1976d2'
+                  }} 
+                />
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>複数選択可能です</FormHelperText>
+        </FormControl>
 
         <FormControl fullWidth margin="dense" size="small">
           <InputLabel id="labels-label">ラベル</InputLabel>

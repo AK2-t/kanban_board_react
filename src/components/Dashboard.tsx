@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import Statistics from './Statistics';
 import LabelManager from './LabelManager';
+import UserManager from './UserManager';
 import { Button, Box, Typography } from '@mui/material';
-import { Label as LabelIcon, FilterList as FilterListIcon } from '@mui/icons-material';
+import { Label as LabelIcon, FilterList as FilterListIcon, People as PeopleIcon } from '@mui/icons-material';
 import TaskFilter from './TaskFilter';
 import { useTheme } from '../context/ThemeContext';
 
@@ -10,6 +11,7 @@ const Dashboard: React.FC = () => {
   const { darkMode } = useTheme();
   const [isLabelManagerOpen, setIsLabelManagerOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isUserManagerOpen, setIsUserManagerOpen] = useState(false);
 
   return (
     <Box
@@ -46,6 +48,14 @@ const Dashboard: React.FC = () => {
           >
             ラベル管理
           </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<PeopleIcon />}
+            onClick={() => setIsUserManagerOpen(true)}
+          >
+            ユーザー管理
+          </Button>
         </Box>
       </Box>
 
@@ -59,6 +69,11 @@ const Dashboard: React.FC = () => {
       <TaskFilter
         open={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
+      />
+
+      <UserManager
+        open={isUserManagerOpen}
+        onClose={() => setIsUserManagerOpen(false)}
       />
     </Box>
   );
