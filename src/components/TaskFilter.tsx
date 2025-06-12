@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useBoard } from '../context/BoardContext';
 import { useTheme } from '../context/ThemeContext';
 import { Task } from '../types';
+import { isOverdue, formatDate } from '../utils/dateUtils';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, FormControl, InputLabel, Select, MenuItem, TextField, Box, Chip, FormHelperText, Typography, Divider, SelectChangeEvent } from '@mui/material';
 
 interface TaskFilterProps {
@@ -18,6 +19,7 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [assignee, setAssignee] = useState<string>('all');
   const [uniqueAssignees, setUniqueAssignees] = useState<string[]>([]);
+  const [dueDateFilter, setDueDateFilter] = useState<string>('all');
 
   useEffect(() => {
     if (!currentBoardId || !open) return;
@@ -73,8 +75,31 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
       filtered = filtered.filter(task => task.assignee === assignee);
     }
     
+    // Due date filter
+    if (dueDateFilter !== 'all') {
+      filtered = filtered.filter(task => {
+        if (dueDateFilter === 'overdue') {
+          return task.dueDate && isOverdue(task.dueDate);
+        }
+        if (dueDateFilter === 'today') {
+          return task.dueDate && task.dueDate === new Date().toISOString().split('T')[0];
+        }
+        if (dueDateFilter === 'upcoming') {
+          const today = new Date();
+          const inThreeDays = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+          return task.dueDate && 
+                 new Date(task.dueDate) > today && 
+                 new Date(task.dueDate) <= inThreeDays;
+        }
+        if (dueDateFilter === 'none') {
+          return !task.dueDate;
+        }
+        return true;
+      });
+    }
+    
     setFilteredTasks(filtered);
-  }, [data, currentBoardId, searchTerm, priority, selectedLabelIds, assignee, open]);
+  }, [data, currentBoardId, searchTerm, priority, selectedLabelIds, assignee, dueDateFilter, open]);
 
   const handleLabelChange = (event: SelectChangeEvent<string[]>) => {
     setSelectedLabelIds(event.target.value as string[]);
@@ -85,6 +110,7 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
     setPriority('all');
     setSelectedLabelIds([]);
     setAssignee('all');
+    setDueDateFilter('all');
   };
 
   if (!currentBoardId) return null;
@@ -133,6 +159,22 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
             </Select>
           </FormControl>
         </Box>
+
+        <FormControl fullWidth margin="dense">
+          <InputLabel id="duedate-filter-label">期限</InputLabel>
+          <Select
+            labelId="duedate-filter-label"
+            value={dueDateFilter}
+            label="期限"
+            onChange={(e) => setDueDateFilter(e.target.value)}
+          >
+            <MenuItem value="all">すべて</MenuItem>
+            <MenuItem value="overdue">期限切れ</MenuItem>
+            <MenuItem value="today">今日</MenuItem>
+            <MenuItem value="upcoming">3日以内</MenuItem>
+            <MenuItem value="none">期限なし</MenuItem>
+          </Select>
+        </FormControl>
 
         <FormControl fullWidth margin="dense">
           <InputLabel id="label-filter-label">ラベル</InputLabel>
@@ -219,6 +261,8 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
                   <Typography variant="caption" color="textSecondary">
                     {column ? `カラム: ${column.title}` : ''}
                     {task.priority !== 'medium' && ` | 優先度: ${task.priority === 'high' ? '高' : '低'}`}
+                    {task.dueDate && ` | 期限: ${formatDate(task.dueDate)}`}
+                    {task.dueDate && isOverdue(task.dueDate) && ' (期限切れ)'}
                   </Typography>
                 </Box>
               );

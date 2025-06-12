@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useBoard } from '../context/BoardContext';
 import { Task } from '../types';
 import { formatDate } from '../utils/dateUtils';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormHelperText, Box, Chip, Typography, IconButton, SelectChangeEvent } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, FormControl, InputLabel, Select, MenuItem, FormHelperText, Box, Chip, Typography, IconButton, SelectChangeEvent, Tabs, Tab, Divider } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import SendIcon from '@mui/icons-material/Send';
 import { useTheme } from '../context/ThemeContext';
 
 interface TaskDetailsProps {
@@ -15,16 +16,21 @@ interface TaskDetailsProps {
 
 const TaskDetails: React.FC<TaskDetailsProps> = ({ open, handleClose, task }) => {
   const { darkMode } = useTheme();
-  const { updateTask, deleteTask, labels } = useBoard();
+  const { updateTask, deleteTask, labels, addComment, markCommentsAsRead } = useBoard();
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState<Task>(task);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(task.labels);
+  const [tabValue, setTabValue] = useState(0);
+  const [newComment, setNewComment] = useState('');
 
   // Update state when task changes
   useEffect(() => {
     setEditedTask(task);
     setSelectedLabelIds(task.labels);
-  }, [task]);
+    if (task.hasNewComments) {
+      markCommentsAsRead(task.id);
+    }
+  }, [task, markCommentsAsRead]);
 
   const handleEditClick = () => {
     setEditedTask({ ...task });

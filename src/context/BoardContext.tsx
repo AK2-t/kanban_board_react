@@ -1,11 +1,12 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { AppData, Board, Task, Column, CustomLabel } from '../types';
+import { AppData, Board, Task, Column, CustomLabel, Comment, HistoryEntry, User } from '../types';
 
 type BoardContextType = {
   data: AppData;
   currentBoardId: string | null;
   labels: CustomLabel[];
+  users: User[];
   addBoard: (title: string) => void;
   updateBoard: (boardId: string, title: string) => void;
   deleteBoard: (boardId: string) => void;
@@ -13,7 +14,7 @@ type BoardContextType = {
   addColumn: (boardId: string, title: string) => void;
   updateColumn: (boardId: string, columnId: string, title: string) => void;
   deleteColumn: (boardId: string, columnId: string) => void;
-  addTask: (columnId: string, task: Omit<Task, 'id' | 'columnId' | 'createdAt'>) => void;
+  addTask: (columnId: string, task: Omit<Task, 'id' | 'columnId' | 'createdAt' | 'comments' | 'history'>) => void;
   updateTask: (taskId: string, updatedTask: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
   moveTask: (taskId: string, sourceColumnId: string, destinationColumnId: string, sourceIndex: number, destinationIndex: number) => void;
@@ -21,6 +22,12 @@ type BoardContextType = {
   addLabel: (name: string, color: string) => void;
   updateLabel: (labelId: string, name: string, color: string) => void;
   deleteLabel: (labelId: string) => void;
+  addUser: (name: string, email: string, role: User['role'], avatar?: string) => void;
+  updateUser: (userId: string, updatedUser: Partial<User>) => void;
+  deleteUser: (userId: string) => void;
+  addComment: (taskId: string, content: string, author: string) => void;
+  addHistoryEntry: (taskId: string, action: HistoryEntry['action'], author: string, details: string) => void;
+  markCommentsAsRead: (taskId: string) => void;
   exportData: () => string;
   importData: (jsonData: string) => void;
 };
@@ -44,6 +51,16 @@ const initialLabels: CustomLabel[] = [
   { id: uuidv4(), name: 'バグ', color: '#f2d600' },
   { id: uuidv4(), name: '調査', color: '#ff9f1a' },
   { id: uuidv4(), name: '改善', color: '#eb5a46' },
+];
+
+const initialUsers: User[] = [
+  { 
+    id: uuidv4(), 
+    name: 'デフォルトユーザー', 
+    email: 'default@example.com', 
+    role: 'admin', 
+    createdAt: Date.now() 
+  },
 ];
 
 const createDefaultBoard = (): Board => {
@@ -100,6 +117,11 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
     return savedLabels ? JSON.parse(savedLabels) : initialLabels;
   });
 
+  const [users, setUsers] = useState<User[]>(() => {
+    const savedUsers = localStorage.getItem('kanbanUsers');
+    return savedUsers ? JSON.parse(savedUsers) : initialUsers;
+  });
+
   useEffect(() => {
     localStorage.setItem('kanbanData', JSON.stringify(data));
   }, [data]);
@@ -107,6 +129,10 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('kanbanLabels', JSON.stringify(labels));
   }, [labels]);
+
+  useEffect(() => {
+    localStorage.setItem('kanbanUsers', JSON.stringify(users));
+  }, [users]);
 
   const addBoard = (title: string) => {
     const newBoard = {
@@ -319,6 +345,14 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
         id: newTaskId,
         columnId,
         createdAt: Date.now(),
+        comments: [],
+        history: [{
+          id: uuidv4(),
+          action: 'created',
+          timestamp: Date.now(),
+          author: 'デフォルトユーザー',
+          details: 'タスクが作成されました'
+        }],
         ...task,
       };
       
@@ -354,9 +388,18 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
       const task = prevData.tasks[taskId];
       if (!task) return prevData;
 
+      const historyEntry: HistoryEntry = {
+        id: uuidv4(),
+        action: 'updated',
+        timestamp: Date.now(),
+        author: 'デフォルトユーザー',
+        details: 'タスクが更新されました'
+      };
+
       const newTask = {
         ...task,
         ...updatedTask,
+        history: [...task.history, historyEntry]
       };
 
       return {
@@ -465,11 +508,21 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
       // Update the task's columnId if it's moving to a different column
       let updatedTasks = prevData.tasks;
       if (sourceColumnId !== destinationColumnId) {
+        const task = prevData.tasks[taskId];
+        const historyEntry: HistoryEntry = {
+          id: uuidv4(),
+          action: 'moved',
+          timestamp: Date.now(),
+          author: 'デフォルトユーザー',
+          details: `タスクが移動されました: ${sourceColumn.title} → ${destinationColumn.title}`
+        };
+        
         updatedTasks = {
           ...prevData.tasks,
           [taskId]: {
-            ...prevData.tasks[taskId],
+            ...task,
             columnId: destinationColumnId,
+            history: [...task.history, historyEntry]
           },
         };
       }
@@ -563,10 +616,141 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
     });
   };
 
+  const addComment = (taskId: string, content: string, author: string) => {
+    setData((prevData) => {
+      const task = prevData.tasks[taskId];
+      if (!task) return prevData;
+
+      const newComment: Comment = {
+        id: uuidv4(),
+        content,
+        author,
+        createdAt: Date.now()
+      };
+
+      const historyEntry: HistoryEntry = {
+        id: uuidv4(),
+        action: 'created',
+        timestamp: Date.now(),
+        author,
+        details: 'コメントが追加されました'
+      };
+
+      const updatedTask = {
+        ...task,
+        comments: [...task.comments, newComment],
+        history: [...task.history, historyEntry],
+        hasNewComments: true
+      };
+
+      return {
+        ...prevData,
+        tasks: {
+          ...prevData.tasks,
+          [taskId]: updatedTask
+        }
+      };
+    });
+  };
+
+  const addHistoryEntry = (taskId: string, action: HistoryEntry['action'], author: string, details: string) => {
+    setData((prevData) => {
+      const task = prevData.tasks[taskId];
+      if (!task) return prevData;
+
+      const historyEntry: HistoryEntry = {
+        id: uuidv4(),
+        action,
+        timestamp: Date.now(),
+        author,
+        details
+      };
+
+      const updatedTask = {
+        ...task,
+        history: [...task.history, historyEntry]
+      };
+
+      return {
+        ...prevData,
+        tasks: {
+          ...prevData.tasks,
+          [taskId]: updatedTask
+        }
+      };
+    });
+  };
+
+  const markCommentsAsRead = (taskId: string) => {
+    setData((prevData) => {
+      const task = prevData.tasks[taskId];
+      if (!task) return prevData;
+
+      const updatedTask = {
+        ...task,
+        hasNewComments: false
+      };
+
+      return {
+        ...prevData,
+        tasks: {
+          ...prevData.tasks,
+          [taskId]: updatedTask
+        }
+      };
+    });
+  };
+
+  const addUser = (name: string, email: string, role: User['role'], avatar?: string) => {
+    const newUser: User = {
+      id: uuidv4(),
+      name,
+      email,
+      role,
+      avatar,
+      createdAt: Date.now(),
+    };
+    
+    setUsers((prevUsers) => [...prevUsers, newUser]);
+  };
+
+  const updateUser = (userId: string, updatedUser: Partial<User>) => {
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === userId ? { ...user, ...updatedUser } : user
+      )
+    );
+  };
+
+  const deleteUser = (userId: string) => {
+    setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
+    
+    // Remove this user from all task assignments
+    setData((prevData) => {
+      const updatedTasks = { ...prevData.tasks };
+      
+      Object.keys(updatedTasks).forEach((taskId) => {
+        const task = updatedTasks[taskId];
+        if (task.assignees.includes(userId)) {
+          updatedTasks[taskId] = {
+            ...task,
+            assignees: task.assignees.filter((id) => id !== userId),
+          };
+        }
+      });
+      
+      return {
+        ...prevData,
+        tasks: updatedTasks,
+      };
+    });
+  };
+
   const exportData = () => {
     const exportData = {
       data,
       labels,
+      users,
     };
     return JSON.stringify(exportData, null, 2);
   };
@@ -577,6 +761,9 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
       if (importedData.data && importedData.labels) {
         setData(importedData.data);
         setLabels(importedData.labels);
+        if (importedData.users) {
+          setUsers(importedData.users);
+        }
         
         // Set current board to the first board
         if (importedData.data.boardOrder.length > 0) {
@@ -593,6 +780,7 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
     data,
     currentBoardId,
     labels,
+    users,
     addBoard,
     updateBoard,
     deleteBoard,
@@ -608,6 +796,12 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
     addLabel,
     updateLabel,
     deleteLabel,
+    addUser,
+    updateUser,
+    deleteUser,
+    addComment,
+    addHistoryEntry,
+    markCommentsAsRead,
     exportData,
     importData,
   };

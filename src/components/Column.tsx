@@ -4,8 +4,8 @@ import { useBoard } from '../context/BoardContext';
 import { Task } from '../types';
 import TaskCard from './TaskCard';
 import TaskForm from './TaskForm';
-import { IconButton, Menu, MenuItem, TextField, Dialog, DialogActions, DialogContent, DialogTitle, Button, Box, Paper, Typography } from '@mui/material';
-import { Add as AddIcon, MoreVert as MoreVertIcon } from '@mui/icons-material';
+import { IconButton, Menu, MenuItem, TextField, Dialog, DialogActions, DialogContent, DialogTitle, Button, Box, Paper, Typography, FormControl, InputLabel, Select } from '@mui/material';
+import { Add as AddIcon, MoreVert as MoreVertIcon, Sort as SortIcon } from '@mui/icons-material';
 import { useTheme } from '../context/ThemeContext';
 
 interface ColumnProps {
@@ -25,6 +25,7 @@ const Column: React.FC<ColumnProps> = ({ column, tasks, index, boardId }) => {
   const [isEditingColumn, setIsEditingColumn] = useState(false);
   const [columnTitle, setColumnTitle] = useState(column.title);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [sortBy, setSortBy] = useState<string>('none');
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -54,6 +55,36 @@ const Column: React.FC<ColumnProps> = ({ column, tasks, index, boardId }) => {
 
   const handleAddTaskToggle = () => {
     setIsAddingTask(!isAddingTask);
+  };
+
+  const getSortedTasks = () => {
+    let sortedTasks = [...tasks];
+    
+    switch (sortBy) {
+      case 'dueDate':
+        sortedTasks.sort((a, b) => {
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        });
+        break;
+      case 'priority':
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        sortedTasks.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
+        break;
+      case 'created':
+        sortedTasks.sort((a, b) => b.createdAt - a.createdAt);
+        break;
+      case 'title':
+        sortedTasks.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      default:
+        // No sorting
+        break;
+    }
+    
+    return sortedTasks;
   };
 
   return (
@@ -94,9 +125,33 @@ const Column: React.FC<ColumnProps> = ({ column, tasks, index, boardId }) => {
             >
               {column.title}
             </Typography>
-            <IconButton size="small" onClick={handleMenuOpen}>
-              <MoreVertIcon fontSize="small" />
-            </IconButton>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FormControl size="small" sx={{ minWidth: 80 }}>
+                <Select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  displayEmpty
+                  sx={{
+                    '& .MuiSelect-select': {
+                      padding: '4px 8px',
+                      fontSize: '0.75rem'
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      border: 'none'
+                    }
+                  }}
+                >
+                  <MenuItem value="none">順序</MenuItem>
+                  <MenuItem value="dueDate">期限順</MenuItem>
+                  <MenuItem value="priority">優先度順</MenuItem>
+                  <MenuItem value="created">作成順</MenuItem>
+                  <MenuItem value="title">タイトル順</MenuItem>
+                </Select>
+              </FormControl>
+              <IconButton size="small" onClick={handleMenuOpen}>
+                <MoreVertIcon fontSize="small" />
+              </IconButton>
+            </Box>
           </Box>
 
           <Droppable droppableId={column.id} type="task">
@@ -114,7 +169,7 @@ const Column: React.FC<ColumnProps> = ({ column, tasks, index, boardId }) => {
                     : 'transparent'
                 }}
               >
-                {tasks.map((task, taskIndex) => (
+                {getSortedTasks().map((task, taskIndex) => (
                   <TaskCard key={task.id} task={task} index={taskIndex} />
                 ))}
                 {provided.placeholder}

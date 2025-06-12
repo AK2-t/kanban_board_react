@@ -1,3 +1,27 @@
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+  role: 'admin' | 'member' | 'viewer';
+  createdAt: number;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  author: string;
+  createdAt: number;
+}
+
+export interface HistoryEntry {
+  id: string;
+  action: 'created' | 'updated' | 'moved' | 'assigned' | 'unassigned' | 'labelAdded' | 'labelRemoved';
+  timestamp: number;
+  author: string;
+  details: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -5,9 +29,12 @@ export interface Task {
   dueDate: string | null;
   priority: 'high' | 'medium' | 'low';
   labels: string[];
-  assignee: string | null;
+  assignees: string[];
   columnId: string;
   createdAt: number;
+  comments: Comment[];
+  history: HistoryEntry[];
+  hasNewComments?: boolean;
 }
 
 export interface Column {
