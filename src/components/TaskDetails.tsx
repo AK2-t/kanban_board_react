@@ -74,6 +74,260 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({ open, handleClose, task }) =>
     .map(labelId => labels.find(label => label.id === labelId))
     .filter(label => label !== undefined);
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  const handleCommentSubmit = () => {
+    if (newComment.trim()) {
+      addComment(task.id, newComment.trim(), 'デフォルトユーザー');
+      setNewComment('');
+    }
+  };
+
+  const renderTaskDetails = () => (
+    <>
+      <Box sx={{
+        marginTop: '1rem',
+        padding: '1rem',
+        backgroundColor: darkMode ? '#333' : '#f5f5f5',
+        borderRadius: '4px'
+      }}>
+        <Typography variant="subtitle2" color="textSecondary">説明</Typography>
+        {task.description ? (
+          <Typography 
+            variant="body2"
+            sx={{
+              whiteSpace: 'pre-wrap',
+              backgroundColor: darkMode ? '#444' : '#fff',
+              padding: '1rem',
+              borderRadius: '4px',
+              marginTop: '0.5rem',
+              border: `1px solid ${darkMode ? '#555' : '#ddd'}`
+            }}
+          >
+            {task.description}
+          </Typography>
+        ) : (
+          <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic', mt: 1 }}>
+            説明がありません
+          </Typography>
+        )}
+      </Box>
+
+      <Box sx={{ display: 'flex', flexDirection: 'row', mt: 2, gap: 2 }}>
+        <Box sx={{ flex: 1 }}>
+          <Box sx={{
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: darkMode ? '#333' : '#f5f5f5',
+            borderRadius: '4px'
+          }}>
+            <Typography variant="subtitle2" color="textSecondary">優先度</Typography>
+            <Box sx={{ mt: 1 }}>
+              <Chip 
+                label={task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'} 
+                color={task.priority === 'high' ? 'error' : task.priority === 'medium' ? 'warning' : 'success'}
+                size="small" 
+              />
+            </Box>
+          </Box>
+        </Box>
+
+        <Box sx={{ flex: 1 }}>
+          <Box sx={{
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: darkMode ? '#333' : '#f5f5f5',
+            borderRadius: '4px'
+          }}>
+            <Typography variant="subtitle2" color="textSecondary">期限</Typography>
+            <Box sx={{ mt: 1 }}>
+              {task.dueDate ? (
+                <Typography variant="body2">{formatDate(task.dueDate)}</Typography>
+              ) : (
+                <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+                  期限なし
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'flex', flexDirection: 'row', mt: 2, gap: 2 }}>
+        <Box sx={{ flex: 1 }}>
+          <Box sx={{
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: darkMode ? '#333' : '#f5f5f5',
+            borderRadius: '4px'
+          }}>
+            <Typography variant="subtitle2" color="textSecondary">担当者</Typography>
+            <Box sx={{ mt: 1 }}>
+              {task.assignee ? (
+                <Chip label={task.assignee} />
+              ) : (
+                <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+                  担当者なし
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </Box>
+
+        <Box sx={{ flex: 1 }}>
+          <Box sx={{
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: darkMode ? '#333' : '#f5f5f5',
+            borderRadius: '4px'
+          }}>
+            <Typography variant="subtitle2" color="textSecondary">ラベル</Typography>
+            {taskLabels.length > 0 ? (
+              <Box sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                marginTop: '0.5rem'
+              }}>
+                {taskLabels.map(label => (
+                  label && (
+                    <Chip
+                      key={label.id}
+                      label={label.name}
+                      size="small"
+                      sx={{ 
+                        backgroundColor: `${label.color}20`,
+                        borderColor: label.color,
+                        color: label.color,
+                        borderWidth: '1px',
+                        borderStyle: 'solid'
+                      }}
+                    />
+                  )
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic', mt: 1 }}>
+                ラベルなし
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      </Box>
+
+      <Box sx={{
+        marginTop: '1rem',
+        padding: '1rem',
+        backgroundColor: darkMode ? '#333' : '#f5f5f5',
+        borderRadius: '4px'
+      }}>
+        <Typography variant="subtitle2" color="textSecondary">作成日時</Typography>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          {new Date(task.createdAt).toLocaleString('ja-JP')}
+        </Typography>
+      </Box>
+    </>
+  );
+
+  const renderComments = () => (
+    <Box>
+      <Box sx={{ mb: 2 }}>
+        <TextField
+          fullWidth
+          multiline
+          rows={3}
+          placeholder="コメントを入力..."
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          sx={{ mb: 1 }}
+        />
+        <Button
+          variant="contained"
+          onClick={handleCommentSubmit}
+          disabled={!newComment.trim()}
+          startIcon={<SendIcon />}
+          size="small"
+        >
+          コメント送信
+        </Button>
+      </Box>
+
+      <Divider sx={{ mb: 2 }} />
+
+      {task.comments && task.comments.length > 0 ? (
+        <Box>
+          {task.comments.map((comment) => (
+            <Box
+              key={comment.id}
+              sx={{
+                mb: 2,
+                p: 2,
+                backgroundColor: darkMode ? '#444' : '#f9f9f9',
+                borderRadius: '8px',
+                border: `1px solid ${darkMode ? '#555' : '#e0e0e0'}`
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" color="primary">
+                  {comment.author}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {new Date(comment.createdAt).toLocaleString('ja-JP')}
+                </Typography>
+              </Box>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                {comment.content}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Typography variant="body2" color="textSecondary" sx={{ textAlign: 'center', py: 3 }}>
+          まだコメントがありません
+        </Typography>
+      )}
+    </Box>
+  );
+
+  const renderHistory = () => (
+    <Box>
+      {task.history && task.history.length > 0 ? (
+        <Box>
+          {task.history.slice().reverse().map((entry) => (
+            <Box
+              key={entry.id}
+              sx={{
+                mb: 2,
+                p: 2,
+                backgroundColor: darkMode ? '#444' : '#f9f9f9',
+                borderRadius: '8px',
+                border: `1px solid ${darkMode ? '#555' : '#e0e0e0'}`
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" color="primary">
+                  {entry.author}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {new Date(entry.timestamp).toLocaleString('ja-JP')}
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="textSecondary">
+                {entry.details}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Typography variant="body2" color="textSecondary" sx={{ textAlign: 'center', py: 3 }}>
+          履歴がありません
+        </Typography>
+      )}
+    </Box>
+  );
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       {isEditing ? (
@@ -204,147 +458,23 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({ open, handleClose, task }) =>
             </Box>
           </DialogTitle>
           <DialogContent>
-            <Box sx={{
-              marginTop: '1rem',
-              padding: '1rem',
-              backgroundColor: darkMode ? '#333' : '#f5f5f5',
-              borderRadius: '4px'
-            }}>
-              <Typography variant="subtitle2" color="textSecondary">説明</Typography>
-              {task.description ? (
-                <Typography 
-                  variant="body2"
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+              <Tabs value={tabValue} onChange={handleTabChange} aria-label="task details tabs">
+                <Tab label="詳細" />
+                <Tab 
+                  label={`コメント (${task.comments?.length || 0})`}
                   sx={{
-                    whiteSpace: 'pre-wrap',
-                    backgroundColor: darkMode ? '#444' : '#fff',
-                    padding: '1rem',
-                    borderRadius: '4px',
-                    marginTop: '0.5rem',
-                    border: `1px solid ${darkMode ? '#555' : '#ddd'}`
+                    color: task.hasNewComments ? 'error.main' : 'inherit',
+                    fontWeight: task.hasNewComments ? 'bold' : 'normal'
                   }}
-                >
-                  {task.description}
-                </Typography>
-              ) : (
-                <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic', mt: 1 }}>
-                  説明がありません
-                </Typography>
-              )}
+                />
+                <Tab label={`履歴 (${task.history?.length || 0})`} />
+              </Tabs>
             </Box>
 
-            <Box sx={{ display: 'flex', flexDirection: 'row', mt: 2, gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{
-                  marginTop: '1rem',
-                  padding: '1rem',
-                  backgroundColor: darkMode ? '#333' : '#f5f5f5',
-                  borderRadius: '4px'
-                }}>
-                  <Typography variant="subtitle2" color="textSecondary">優先度</Typography>
-                  <Box sx={{ mt: 1 }}>
-                    <Chip 
-                      label={task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'} 
-                      color={task.priority === 'high' ? 'error' : task.priority === 'medium' ? 'warning' : 'success'}
-                      size="small" 
-                    />
-                  </Box>
-                </Box>
-              </Box>
-
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{
-                  marginTop: '1rem',
-                  padding: '1rem',
-                  backgroundColor: darkMode ? '#333' : '#f5f5f5',
-                  borderRadius: '4px'
-                }}>
-                  <Typography variant="subtitle2" color="textSecondary">期限</Typography>
-                  <Box sx={{ mt: 1 }}>
-                    {task.dueDate ? (
-                      <Typography variant="body2">{formatDate(task.dueDate)}</Typography>
-                    ) : (
-                      <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
-                        期限なし
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
-
-            <Box sx={{ display: 'flex', flexDirection: 'row', mt: 2, gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{
-                  marginTop: '1rem',
-                  padding: '1rem',
-                  backgroundColor: darkMode ? '#333' : '#f5f5f5',
-                  borderRadius: '4px'
-                }}>
-                  <Typography variant="subtitle2" color="textSecondary">担当者</Typography>
-                  <Box sx={{ mt: 1 }}>
-                    {task.assignee ? (
-                      <Chip label={task.assignee} />
-                    ) : (
-                      <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
-                        担当者なし
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-              </Box>
-
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{
-                  marginTop: '1rem',
-                  padding: '1rem',
-                  backgroundColor: darkMode ? '#333' : '#f5f5f5',
-                  borderRadius: '4px'
-                }}>
-                  <Typography variant="subtitle2" color="textSecondary">ラベル</Typography>
-                  {taskLabels.length > 0 ? (
-                    <Box sx={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem',
-                      marginTop: '0.5rem'
-                    }}>
-                      {taskLabels.map(label => (
-                        label && (
-                          <Chip
-                            key={label.id}
-                            label={label.name}
-                            size="small"
-                            sx={{ 
-                              backgroundColor: `${label.color}20`,
-                              borderColor: label.color,
-                              color: label.color,
-                              borderWidth: '1px',
-                              borderStyle: 'solid'
-                            }}
-                          />
-                        )
-                      ))}
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic', mt: 1 }}>
-                      ラベルなし
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-            </Box>
-
-            <Box sx={{
-              marginTop: '1rem',
-              padding: '1rem',
-              backgroundColor: darkMode ? '#333' : '#f5f5f5',
-              borderRadius: '4px'
-            }}>
-              <Typography variant="subtitle2" color="textSecondary">作成日時</Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                {new Date(task.createdAt).toLocaleString('ja-JP')}
-              </Typography>
-            </Box>
+            {tabValue === 0 && renderTaskDetails()}
+            {tabValue === 1 && renderComments()}
+            {tabValue === 2 && renderHistory()}
           </DialogContent>
           <DialogActions>
             <Button onClick={handleClose} color="primary">閉じる</Button>
