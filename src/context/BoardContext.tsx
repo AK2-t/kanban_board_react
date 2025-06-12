@@ -319,7 +319,7 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
     });
   };
 
-  const addTask = (columnId: string, task: Omit<Task, 'id' | 'columnId' | 'createdAt'>) => {
+  const addTask = (columnId: string, task: Omit<Task, 'id' | 'columnId' | 'createdAt' | 'comments' | 'history'>) => {
     const newTaskId = uuidv4();
     
     setData((prevData) => {
@@ -342,6 +342,7 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
       if (!column) return prevData;
       
       const newTask: Task = {
+        ...task,
         id: newTaskId,
         columnId,
         createdAt: Date.now(),
@@ -352,8 +353,7 @@ export const BoardProvider: React.FC<BoardProviderProps> = ({ children }) => {
           timestamp: Date.now(),
           author: 'デフォルトユーザー',
           details: 'タスクが作成されました'
-        }],
-        ...task,
+        }]
       };
       
       const updatedColumn = {

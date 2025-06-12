@@ -12,13 +12,12 @@ interface TaskFilterProps {
 
 const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
   const { darkMode } = useTheme();
-  const { data, currentBoardId, labels } = useBoard();
+  const { data, currentBoardId, labels, users } = useBoard();
   const [searchTerm, setSearchTerm] = useState('');
   const [priority, setPriority] = useState<string>('all');
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
-  const [assignee, setAssignee] = useState<string>('all');
-  const [uniqueAssignees, setUniqueAssignees] = useState<string[]>([]);
+  const [selectedAssignee, setSelectedAssignee] = useState<string>('all');
   const [dueDateFilter, setDueDateFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -29,7 +28,6 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
     
     // Collect all tasks in the current board
     const allTasks: Task[] = [];
-    const assignees = new Set<string>();
     
     board.columnOrder.forEach(columnId => {
       const column = board.columns[columnId];
@@ -37,14 +35,9 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
         const task = data.tasks[taskId];
         if (task) {
           allTasks.push(task);
-          if (task.assignee) {
-            assignees.add(task.assignee);
-          }
         }
       });
     });
-    
-    setUniqueAssignees(Array.from(assignees).sort());
     
     // Apply filters
     let filtered = allTasks;
@@ -71,8 +64,8 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
     }
     
     // Assignee filter
-    if (assignee !== 'all') {
-      filtered = filtered.filter(task => task.assignee === assignee);
+    if (selectedAssignee !== 'all') {
+      filtered = filtered.filter(task => task.assignees.includes(selectedAssignee));
     }
     
     // Due date filter
@@ -99,7 +92,7 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
     }
     
     setFilteredTasks(filtered);
-  }, [data, currentBoardId, searchTerm, priority, selectedLabelIds, assignee, dueDateFilter, open]);
+  }, [data, currentBoardId, searchTerm, priority, selectedLabelIds, selectedAssignee, dueDateFilter, open]);
 
   const handleLabelChange = (event: SelectChangeEvent<string[]>) => {
     setSelectedLabelIds(event.target.value as string[]);
@@ -109,7 +102,7 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
     setSearchTerm('');
     setPriority('all');
     setSelectedLabelIds([]);
-    setAssignee('all');
+    setSelectedAssignee('all');
     setDueDateFilter('all');
   };
 
@@ -148,13 +141,24 @@ const TaskFilter: React.FC<TaskFilterProps> = ({ open, onClose }) => {
             <InputLabel id="assignee-filter-label">担当者</InputLabel>
             <Select
               labelId="assignee-filter-label"
-              value={assignee}
+              value={selectedAssignee}
               label="担当者"
-              onChange={(e) => setAssignee(e.target.value)}
+              onChange={(e) => setSelectedAssignee(e.target.value)}
             >
               <MenuItem value="all">すべて</MenuItem>
-              {uniqueAssignees.map((name) => (
-                <MenuItem key={name} value={name}>{name}</MenuItem>
+              {users.map((user) => (
+                <MenuItem key={user.id} value={user.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {user.avatar && (
+                      <img 
+                        src={user.avatar} 
+                        alt={user.name}
+                        style={{ width: '20px', height: '20px', borderRadius: '50%' }}
+                      />
+                    )}
+                    <span>{user.name}</span>
+                  </Box>
+                </MenuItem>
               ))}
             </Select>
           </FormControl>

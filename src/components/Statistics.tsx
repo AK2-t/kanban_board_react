@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import { useBoard } from '../context/BoardContext';
-import { Typography, Paper, Box, Divider, Chip } from '@mui/material';
+import { Typography, Paper, Box, Divider, Chip, Avatar } from '@mui/material';
 import { Task } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { isOverdue } from '../utils/dateUtils';
 
 const Statistics: React.FC = () => {
   const { darkMode } = useTheme();
-  const { data, currentBoardId, labels } = useBoard();
+  const { data, currentBoardId, labels, users } = useBoard();
 
   const stats = useMemo(() => {
     if (!currentBoardId) return null;
@@ -73,6 +73,36 @@ const Statistics: React.FC = () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5); // Top 5 labels
     
+    // Calculate user statistics
+    const userStats: { [key: string]: { total: number; completed: number } } = {};
+    
+    users.forEach(user => {
+      userStats[user.id] = { total: 0, completed: 0 };
+    });
+    
+    allTasks.forEach(task => {
+      task.assignees.forEach(userId => {
+        if (userStats[userId]) {
+          userStats[userId].total++;
+          if (completedColumnIds.includes(task.columnId)) {
+            userStats[userId].completed++;
+          }
+        }
+      });
+    });
+    
+    const topUsers = users
+      .map(user => ({
+        ...user,
+        stats: userStats[user.id] || { total: 0, completed: 0 },
+        completionRate: userStats[user.id].total > 0 
+          ? Math.round((userStats[user.id].completed / userStats[user.id].total) * 100) 
+          : 0
+      }))
+      .filter(user => user.stats.total > 0)
+      .sort((a, b) => b.stats.total - a.stats.total)
+      .slice(0, 5); // Top 5 users
+    
     return {
       totalTasks,
       completedTasks,
@@ -80,8 +110,9 @@ const Statistics: React.FC = () => {
       overdueTasks,
       highPriorityTasks,
       topLabels: sortedLabels,
+      topUsers: topUsers,
     };
-  }, [data, currentBoardId, labels]);
+  }, [data, currentBoardId, labels, users]);
 
   if (!stats) return null;
 
@@ -234,6 +265,68 @@ const Statistics: React.FC = () => {
         ) : (
           <Typography variant="body2" sx={{ mt: 1 }} color="textSecondary">
             ラベルがまだ使われていません
+          </Typography>
+        )}
+      </Paper>
+      
+      <Paper 
+        sx={{ 
+          marginTop: 2,
+          padding: '1rem',
+          backgroundColor: darkMode ? '#333' : '#fff',
+          color: darkMode ? '#fff' : '#333'
+        }}
+      >
+        <Typography 
+          variant="subtitle2" 
+          color="textSecondary"
+          sx={{ fontWeight: 500 }}
+        >
+          担当者別統計
+        </Typography>
+        
+        {stats.topUsers.length > 0 ? (
+          <Box sx={{ marginTop: '0.5rem' }}>
+            {stats.topUsers.map(user => (
+              <Box 
+                key={user.id}
+                sx={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  mb: 1,
+                  p: 1,
+                  borderRadius: 1,
+                  backgroundColor: darkMode ? '#444' : '#f5f5f5'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Avatar
+                    src={user.avatar}
+                    alt={user.name}
+                    sx={{ width: 24, height: 24 }}
+                  >
+                    {user.name.charAt(0)}
+                  </Avatar>
+                  <Typography variant="body2">{user.name}</Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    {user.stats.completed}/{user.stats.total} タスク
+                  </Typography>
+                  <Chip
+                    label={`${user.completionRate}%`}
+                    size="small"
+                    color={user.completionRate >= 80 ? 'success' : user.completionRate >= 50 ? 'warning' : 'error'}
+                  />
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          <Typography variant="body2" sx={{ mt: 1 }} color="textSecondary">
+            タスクが担当者に割り当てられていません
           </Typography>
         )}
       </Paper>

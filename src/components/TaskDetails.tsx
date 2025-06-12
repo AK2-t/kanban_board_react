@@ -165,8 +165,12 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({ open, handleClose, task }) =>
           }}>
             <Typography variant="subtitle2" color="textSecondary">担当者</Typography>
             <Box sx={{ mt: 1 }}>
-              {task.assignee ? (
-                <Chip label={task.assignee} />
+              {task.assignees && task.assignees.length > 0 ? (
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {task.assignees.map((assignee, index) => (
+                    <Chip key={index} label={assignee} />
+                  ))}
+                </Box>
               ) : (
                 <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
                   担当者なし
@@ -382,11 +386,17 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({ open, handleClose, task }) =>
             />
             <TextField
               margin="dense"
-              name="assignee"
-              label="担当者"
+              name="assignees"
+              label="担当者（カンマ区切り）"
               fullWidth
-              value={editedTask.assignee || ''}
-              onChange={handleInputChange}
+              value={editedTask.assignees?.join(', ') || ''}
+              onChange={(e) => {
+                const assignees = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                setEditedTask(prev => ({
+                  ...prev,
+                  assignees
+                }));
+              }}
             />
             <FormControl fullWidth margin="dense">
               <InputLabel id="labels-label">ラベル</InputLabel>

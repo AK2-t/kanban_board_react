@@ -5,8 +5,8 @@ import TaskDetails from './TaskDetails';
 import { formatDate, isOverdue, isToday, isUpcoming } from '../utils/dateUtils';
 import { useTheme } from '../context/ThemeContext';
 import { useBoard } from '../context/BoardContext';
-import { Paper, Typography, Chip, Box } from '@mui/material';
-import { PriorityHigh, Label } from '@mui/icons-material';
+import { Paper, Typography, Chip, Box, Badge } from '@mui/material';
+import { PriorityHigh, Label, Comment } from '@mui/icons-material';
 
 interface TaskProps {
   task: TaskType;
@@ -104,16 +104,34 @@ const TaskCard: React.FC<TaskProps> = ({ task, index }) => {
               }
             }}
           >
-            <Typography 
-              variant="body1" 
-              sx={{ 
-                fontWeight: 500, 
-                marginBottom: '0.5rem', 
-                wordBreak: 'break-word'
-              }}
-            >
-              {task.title}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+              <Typography 
+                variant="body1" 
+                sx={{ 
+                  fontWeight: 500, 
+                  wordBreak: 'break-word',
+                  flex: 1
+                }}
+              >
+                {task.title}
+              </Typography>
+              
+              {task.hasNewComments && (
+                <Badge 
+                  color="error" 
+                  variant="dot"
+                  sx={{ 
+                    ml: 1,
+                    '& .MuiBadge-badge': {
+                      right: -2,
+                      top: 2
+                    }
+                  }}
+                >
+                  <Comment fontSize="small" color="action" />
+                </Badge>
+              )}
+            </Box>
             
             {taskLabels.length > 0 && (
               <Box sx={{ 
@@ -165,9 +183,9 @@ const TaskCard: React.FC<TaskProps> = ({ task, index }) => {
                   </Box>
                 )}
                 
-                {task.assignee && (
+                {task.assignees && task.assignees.length > 0 && (
                   <Chip 
-                    label={task.assignee} 
+                    label={task.assignees[0]} 
                     size="small"
                     sx={{ 
                       height: '20px', 
